@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Detector de anomalías Critical Signal.">
+  <meta name="description" content="Critical Signal anomaly detector.">
   <title>Critical Signal · Detector</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
@@ -11,50 +11,50 @@
   <div class="page-shell">
     <main class="main-content">
       <section class="intro">
-        <p class="label">Detector de anomalías</p>
-        <h1>Comprueba una señal.</h1>
-        <p class="intro-copy">Analiza una medición con el modelo.</p>
+        <p class="label">Anomaly detector</p>
+        <h1>Check a signal.</h1>
+        <p class="intro-copy">Analyze one measurement with the model.</p>
       </section>
 
       <section class="analysis-layout">
-        <section class="detector" aria-label="Analizar una medición">
+        <section class="detector" aria-label="Analyze a measurement">
           <form id="measurement-form">
-            <label for="value">Valor de la medición</label>
+            <label for="value">Measurement value</label>
             <div class="input-line">
               <input id="value" name="value" type="number" step="any" placeholder="70" required>
               <span>°C</span>
             </div>
-            <button class="primary-button" type="submit">Analizar señal</button>
+            <button class="primary-button" type="submit">Analyze signal</button>
           </form>
-          <p class="test-help">Prueba normal: analiza <button type="button" data-value="70">70</button> cuatro veces. Después analiza <button type="button" data-value="445">445</button> para provocar una anomalía.</p>
+          <p class="test-help">Normal test: analyze <button type="button" data-value="70">70</button> four times. Then analyze <button type="button" data-value="445">445</button> to trigger an anomaly.</p>
         </section>
 
         <div class="analysis-result">
           <section class="result" id="result" aria-live="polite">
-            <div class="result-heading"><span class="result-dot"></span><span id="verdict-label">Sin análisis</span></div>
+            <div class="result-heading"><span class="result-dot"></span><span id="verdict-label">No analysis yet</span></div>
             <strong id="verdict-value">—</strong>
-            <p id="verdict-detail">El resultado aparecerá aquí.</p>
+            <p id="verdict-detail">The result will appear here.</p>
           </section>
 
-          <section class="metrics" aria-label="Detalles del análisis">
-            <div><span>Predicción</span><strong id="prediction">—</strong></div>
+          <section class="metrics" aria-label="Analysis details">
+              <div><span>Prediction</span><strong id="prediction">—</strong></div>
             <div><span>Error</span><strong id="error">—</strong></div>
-            <div><span>Umbral</span><strong>{{ '%.2f'|format(threshold) }}</strong></div>
+              <div><span>Threshold</span><strong>{{ '%.2f'|format(threshold) }}</strong></div>
           </section>
 
-          <div class="response" id="response-box" aria-live="polite">La medición se guardará en RedisTimeSeries.</div>
-          <button class="reset-button" id="reset-button" type="button">Reiniciar prueba</button>
+          <div class="response" id="response-box" aria-live="polite">The measurement will be stored in RedisTimeSeries.</div>
+          <button class="reset-button" id="reset-button" type="button">Reset test</button>
         </div>
       </section>
 
       <section class="chart-section" aria-labelledby="chart-title">
         <div class="chart-heading">
-          <h2 id="chart-title">Valores recientes</h2>
-          <span class="chart-legend"><i class="normal-dot"></i> normal <i class="anomaly-dot"></i> anomalía</span>
+          <h2 id="chart-title">Recent values</h2>
+          <span class="chart-legend"><i class="normal-dot"></i> normal <i class="anomaly-dot"></i> anomaly</span>
         </div>
-        <canvas id="measurements-chart" height="180" aria-label="Gráfico de valores recientes"></canvas>
-        <div class="chart-data" id="chart-data" aria-label="Valores enumerados"></div>
-        <p class="chart-empty" id="chart-empty">El gráfico aparecerá al enviar una medición.</p>
+        <canvas id="measurements-chart" height="180" aria-label="Recent values chart"></canvas>
+        <div class="chart-data" id="chart-data" aria-label="Enumerated values"></div>
+        <p class="chart-empty" id="chart-empty">The chart will appear after sending a measurement.</p>
       </section>
     </main>
 

@@ -88,10 +88,10 @@ def parse_value(source: Any) -> float:
     if isinstance(source, dict) or hasattr(source, "get"):
         source = source.get("value", source.get("dato"))
     if source is None or str(source).strip() == "":
-        raise ValueError("Falta el valor de la medición.")
+        raise ValueError("Measurement value is required.")
     value = float(source)
     if not np.isfinite(value):
-        raise ValueError("La medición debe ser un número finito.")
+        raise ValueError("Measurement must be a finite number.")
     return value
 
 
@@ -101,7 +101,7 @@ def predict(value: float, previous: list[dict[str, Any]]) -> dict[str, Any]:
         return {
             "status": "warming_up",
             "anomaly": False,
-            "anomaly_label": "Recopilando contexto",
+            "anomaly_label": "Collecting context",
             "prediction": None,
             "error": None,
         }
@@ -110,7 +110,7 @@ def predict(value: float, previous: list[dict[str, Any]]) -> dict[str, Any]:
         return {
             "status": "model_unavailable",
             "anomaly": None,
-            "anomaly_label": "Modelo no disponible",
+            "anomaly_label": "Model unavailable",
             "prediction": None,
             "error": None,
         }
@@ -130,7 +130,7 @@ def predict(value: float, previous: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "status": "anomaly" if anomaly else "normal",
         "anomaly": anomaly,
-        "anomaly_label": "Anomalía detectada" if anomaly else "Dentro del patrón",
+        "anomaly_label": "Anomaly detected" if anomaly else "Within expected pattern",
         "prediction": prediction,
         "error": error,
     }
@@ -203,7 +203,7 @@ def measurements():
             | {"measurements": enrich_measurements(history, limit)}
         )
     except (RedisError, ValueError) as exc:
-        return jsonify({"error": f"No se pudieron leer las mediciones: {exc}"}), 503
+        return jsonify({"error": f"Could not read measurements: {exc}"}), 503
 
 
 def store_measurement(value: float) -> dict[str, Any]:
@@ -232,7 +232,7 @@ def detect_api():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except RedisError:
-        return jsonify({"error": "RedisTimeSeries no está disponible."}), 503
+        return jsonify({"error": "RedisTimeSeries is unavailable."}), 503
 
 
 @app.post("/api/reset")
@@ -241,7 +241,7 @@ def reset_api():
         deleted = bool(redis_client.delete(SERIES_NAME))
         return jsonify({"deleted": deleted, "message": "Serie reiniciada."})
     except RedisError:
-        return jsonify({"error": "RedisTimeSeries no está disponible."}), 503
+        return jsonify({"error": "RedisTimeSeries is unavailable."}), 503
 
 
 # Compatibilidad con las rutas utilizadas en las prácticas y en ZooKeeper.
@@ -258,7 +258,7 @@ def add_legacy():
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except RedisError:
-        return jsonify({"ok": False, "error": "RedisTimeSeries no está disponible."}), 503
+        return jsonify({"ok": False, "error": "RedisTimeSeries is unavailable."}), 503
 
 
 @app.route("/detectar", methods=["GET", "POST"])

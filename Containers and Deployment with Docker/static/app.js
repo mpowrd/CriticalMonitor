@@ -152,12 +152,12 @@ function showResult(data) {
   const warmingUp = analysis.status === "warming_up";
 
   result.classList.toggle("is-alert", isAnomaly);
-  document.querySelector("#verdict-label").textContent = warmingUp ? "Recopilando contexto" : isAnomaly ? "Anomalía detectada" : "Señal normal";
+  document.querySelector("#verdict-label").textContent = warmingUp ? "Collecting context" : isAnomaly ? "Anomaly detected" : "Signal normal";
   document.querySelector("#verdict-value").textContent = formatNumber(data.measurement.value);
-  document.querySelector("#verdict-detail").textContent = warmingUp ? "Necesitamos más señales para comparar el patrón." : isAnomaly ? "El error supera el umbral configurado." : "La señal está dentro del patrón aprendido.";
+  document.querySelector("#verdict-detail").textContent = warmingUp ? "More signals are needed to compare the pattern." : isAnomaly ? "The error is above the configured threshold." : "The signal is within the learned pattern.";
   document.querySelector("#prediction").textContent = formatNumber(analysis.prediction);
   document.querySelector("#error").textContent = formatNumber(analysis.error);
-  responseBox.textContent = "Medición guardada en RedisTimeSeries.";
+  responseBox.textContent = "Measurement stored in RedisTimeSeries.";
   renderChart(data.measurements);
 }
 
@@ -175,7 +175,7 @@ async function loadMeasurements() {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!valueInput.value) return;
-  responseBox.textContent = "Analizando…";
+  responseBox.textContent = "Analyzing…";
 
   try {
     const response = await fetch("/api/detect", {
@@ -184,7 +184,7 @@ form.addEventListener("submit", async (event) => {
       body: JSON.stringify({ value: valueInput.value }),
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "No se pudo analizar la medición.");
+    if (!response.ok) throw new Error(data.error || "Could not analyze the measurement.");
     showResult(data);
     valueInput.value = "";
   } catch (error) {
@@ -202,12 +202,12 @@ document.querySelectorAll("[data-value]").forEach((button) => {
 document.querySelector("#reset-button").addEventListener("click", async () => {
   await fetch("/api/reset", { method: "POST" });
   result.classList.remove("is-alert");
-  document.querySelector("#verdict-label").textContent = "Sin análisis";
+  document.querySelector("#verdict-label").textContent = "No analysis yet";
   document.querySelector("#verdict-value").textContent = "—";
-  document.querySelector("#verdict-detail").textContent = "El resultado aparecerá aquí.";
+  document.querySelector("#verdict-detail").textContent = "The result will appear here.";
   document.querySelector("#prediction").textContent = "—";
   document.querySelector("#error").textContent = "—";
-  responseBox.textContent = "Prueba reiniciada.";
+  responseBox.textContent = "Test reset.";
   renderChart([]);
 });
 
