@@ -4,6 +4,7 @@ const result = document.querySelector("#result");
 const responseBox = document.querySelector("#response-box");
 const chartSection = document.querySelector(".chart-section");
 const chart = document.querySelector("#measurements-chart");
+const chartData = document.querySelector("#chart-data");
 let lastMeasurements = [];
 
 const formatNumber = (value) => value === null || value === undefined ? "—" : Number(value).toFixed(2);
@@ -11,54 +12,138 @@ const formatNumber = (value) => value === null || value === undefined ? "—" : 
 function renderChart(measurements = []) {
   lastMeasurements = measurements;
   chartSection.classList.toggle("has-data", measurements.length > 0);
+  chartData.replaceChildren();
 
-  const width = Math.max(chart.clientWidth, 280);
-  const height = 180;
-  const scale = window.devicePixelRatio || 1;
-  chart.width = width * scale;
-  chart.height = height * scale;
+  const dataStart = Math.max(0, measurements.length - 12);
+  measurements.slice(dataStart).forEach((item, index) => {
+    const label = document.createElement("span");
+    const itemNumber = dataStart + index + 1;
+    label.className = `chart-data-item${item.anomaly === true ? " anomaly" : item.status === "warming_up" ? " context" : ""}`;
+    label.textContent = `#${itemNumber} · ${formatNumber(item.value)} °C`;
+    chartData.appendChild(label);
+  });
+
+  const width = Math.max(Math.round(chart.clientWidth), 280);
+  const height = Math.max(Math.round(chart.clientHeight), 220);
+  const scale = Math.min(window.devicePixelRatio || 1, 2);
+  chart.width = Math.round(width * scale);
+  chart.height = Math.round(height * scale);
   const context = chart.getContext("2d");
-  context.scale(scale, scale);
+  context.setTransform(scale, 0, 0, scale, 0, 0);
   context.clearRect(0, 0, width, height);
 
-  context.strokeStyle = "#eeeaf4";
+  const margin = { top: 18, right: 18, bottom: 34, left: 48 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const plotRight = margin.left + plotWidth;
+  const plotBottom = margin.top + plotHeight;
+  const values = measurements.map((item) => Number(item.value));
+
+  context.font = "12px system-ui, sans-serif";
   context.lineWidth = 1;
-  [35, 90, 145].forEach((y) => {
+  context.strokeStyle = "#ebe7f2";
+  context.fillStyle = "#8a8196";
+  context.textAlign = "right";
+  context.textBaseline = "middle";
+
+  if (values.length) {
+    const rawMinimum = Math.min(...values);
+    const rawMaximum = Math.max(...values);
+    const lowerBound = Math.min(0, rawMinimum);
+    const usefulRange = Math.max(rawMaximum - lowerBound, 50);
+    const magnitude = 10 ** Math.floor(Math.log10(usefulRange / 4));
+    const step = Math.max(1, Math.ceil(usefulRange / 4 / magnitude) * magnitude);
+    const minimum = Math.floor(lowerBound / step) * step;
+    const maximum = Math.max(Math.ceil(rawMaximum / step) * step, minimum + step * 4);
+    const tickCount = Math.round((maximum - minimum) / step);
+
+    for (let tick = 0; tick <= tickCount; tick += 1) {
+      const value = minimum + tick * step;
+      const y = plotBottom - ((value - minimum) / (maximum - minimum)) * plotHeight;
+      context.beginPath();
+      context.moveTo(margin.left, y);
+      context.lineTo(plotRight, y);
+      context.stroke();
+      context.fillText(`${formatNumber(value).replace(".00", "")} °C`, margin.left - 10, y);
+    }
+
     context.beginPath();
-    context.moveTo(0, y);
-    context.lineTo(width, y);
+    context.moveTo(margin.left, margin.top);
+    context.lineTo(margin.left, plotBottom);
+    context.lineTo(plotRight, plotBottom);
+    context.strokeStyle = "#dcd5e7";
     context.stroke();
-  });
 
-  if (!measurements.length) return;
+    const visibleStart = Math.max(0, measurements.length - 24);
+    const visibleMeasurements = measurements.slice(visibleStart);
+    const point = (item, index) => ({
+      x: visibleMeasurements.length === 1 ? margin.left + plotWidth / 2 : margin.left + (index / (visibleMeasurements.length - 1)) * plotWidth,
+      y: plotBottom - ((Number(item.value) - minimum) / (maximum - minimum)) * plotHeight,
+    });
+    const points = visibleMeasurements.map(point);
+    const colorFor = (item) => item.anomaly === true ? "#a21caf" : item.status === "warming_up" ? "#c4b5fd" : "#6d28d9";
 
-  const values = measurements.map((item) => item.value);
-  const minimum = Math.min(...values);
-  const maximum = Math.max(...values);
-  const range = Math.max(maximum - minimum, 1);
-  const padding = 18;
-  const point = (item, index) => ({
-    x: measurements.length === 1 ? width / 2 : (index / (measurements.length - 1)) * width,
-    y: height - padding - ((item.value - minimum) / range) * (height - padding * 2),
-  });
-
-  context.beginPath();
-  measurements.forEach((item, index) => {
-    const position = point(item, index);
-    if (index === 0) context.moveTo(position.x, position.y);
-    else context.lineTo(position.x, position.y);
-  });
-  context.strokeStyle = "#8b5cf6";
-  context.lineWidth = 2;
-  context.stroke();
-
-  measurements.forEach((item, index) => {
-    const position = point(item, index);
     context.beginPath();
-    context.arc(position.x, position.y, item.anomaly === true ? 5 : 3.5, 0, Math.PI * 2);
-    context.fillStyle = item.anomaly === true ? "#a21caf" : item.status === "warming_up" ? "#c4b5fd" : "#6d28d9";
+    context.moveTo(points[0].x, plotBottom);
+    points.forEach((position) => context.lineTo(position.x, position.y));
+    context.lineTo(points[points.length - 1].x, plotBottom);
+    context.closePath();
+    const fill = context.createLinearGradient(0, margin.top, 0, plotBottom);
+    fill.addColorStop(0, "rgba(109, 40, 217, .10)");
+    fill.addColorStop(1, "rgba(109, 40, 217, 0)");
+    context.fillStyle = fill;
     context.fill();
-  });
+
+    context.beginPath();
+    points.forEach((position, index) => {
+      if (index === 0) context.moveTo(position.x, position.y);
+      else context.lineTo(position.x, position.y);
+    });
+    context.strokeStyle = "#8b5cf6";
+    context.lineWidth = 2.5;
+    context.lineJoin = "round";
+    context.lineCap = "round";
+    context.stroke();
+
+    visibleMeasurements.slice(1).forEach((item, index) => {
+      if (item.anomaly !== true && visibleMeasurements[index].anomaly !== true) return;
+      context.beginPath();
+      context.moveTo(points[index].x, points[index].y);
+      context.lineTo(points[index + 1].x, points[index + 1].y);
+      context.strokeStyle = "#a21caf";
+      context.lineWidth = 3;
+      context.stroke();
+    });
+
+    points.forEach((position, index) => {
+      const item = visibleMeasurements[index];
+      context.beginPath();
+      context.arc(position.x, position.y, item.anomaly === true ? 5 : 4, 0, Math.PI * 2);
+      context.fillStyle = "#ffffff";
+      context.fill();
+      context.beginPath();
+      context.arc(position.x, position.y, item.anomaly === true ? 4 : 3, 0, Math.PI * 2);
+      context.fillStyle = colorFor(item);
+      context.fill();
+    });
+
+    const labelIndices = visibleMeasurements.length <= 5
+      ? visibleMeasurements.map((_, index) => index)
+      : [0, Math.floor((visibleMeasurements.length - 1) / 2), visibleMeasurements.length - 1];
+    context.fillStyle = "#8a8196";
+    context.textAlign = "center";
+    context.textBaseline = "alphabetic";
+    labelIndices.forEach((index) => {
+      context.fillText(`#${visibleStart + index + 1}`, points[index].x, height - 9);
+    });
+  } else {
+    context.beginPath();
+    context.moveTo(margin.left, margin.top);
+    context.lineTo(margin.left, plotBottom);
+    context.lineTo(plotRight, plotBottom);
+    context.strokeStyle = "#dcd5e7";
+    context.stroke();
+  }
 }
 
 function showResult(data) {
@@ -74,16 +159,6 @@ function showResult(data) {
   document.querySelector("#error").textContent = formatNumber(analysis.error);
   responseBox.textContent = "Medición guardada en RedisTimeSeries.";
   renderChart(data.measurements);
-}
-
-async function checkConnection() {
-  try {
-    const response = await fetch("/api/health");
-    const data = await response.json();
-    document.querySelector("#system-state").textContent = data.redis === "connected" ? "Conectado" : "Redis no disponible";
-  } catch (error) {
-    document.querySelector("#system-state").textContent = "Sin conexión";
-  }
 }
 
 async function loadMeasurements() {
@@ -136,6 +211,5 @@ document.querySelector("#reset-button").addEventListener("click", async () => {
   renderChart([]);
 });
 
-checkConnection();
 loadMeasurements();
 window.addEventListener("resize", () => renderChart(lastMeasurements));

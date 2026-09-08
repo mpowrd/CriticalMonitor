@@ -17,21 +17,349 @@ button, input { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 a { color: inherit; }
 
-.page-shell { width: min(100% - 40px, 760px); min-height: 100vh; margin: auto; display: flex; flex-direction: column; }
+.page-shell { width: 100%; min-height: 100vh; padding: 0 clamp(24px, 5vw, 72px); display: flex; flex-direction: column; }
 .topbar { display: flex; align-items: center; justify-content: space-between; min-height: 78px; border-bottom: 1px solid var(--border); font-size: 15px; }
 .brand { display: inline-flex; align-items: center; gap: 9px; color: var(--text); text-decoration: none; font-size: 15px; font-weight: 700; letter-spacing: -.02em; }
 .brand-mark { display: block; width: 16px; height: 16px; border-radius: 5px; background: var(--purple); }
 .connection { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 13px; }.connection i { width: 7px; height: 7px; border-radius: 50%; background: var(--purple); }
 
-.main-content { width: min(100%, 520px); margin: 0 auto; padding: 92px 0 70px; flex: 1; }
+.main-content { width: 100%; margin: 0; padding: 92px 0 70px; flex: 1; }
 .intro { margin-bottom: 46px; }.label { margin: 0 0 13px; color: var(--purple); font-size: 14px; font-weight: 700; letter-spacing: .02em; }.intro h1 { margin: 0; font-size: clamp(34px, 8vw, 48px); line-height: 1.04; letter-spacing: -.055em; }.intro-copy { max-width: 400px; margin: 17px 0 0; color: var(--muted); font-size: 17px; line-height: 1.6; }
+.analysis-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; align-items: start; }
 .detector { padding: 22px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }.detector label { display: block; margin-bottom: 11px; color: var(--muted); font-size: 14px; font-weight: 600; }.input-line { display: flex; align-items: center; padding-bottom: 8px; border-bottom: 2px solid var(--purple); }.input-line input { min-width: 0; flex: 1; padding: 0; border: 0; outline: 0; color: var(--text); background: transparent; font-size: 38px; font-weight: 650; letter-spacing: -.06em; }.input-line span { color: var(--muted); font-size: 14px; }.primary-button { width: 100%; min-height: 45px; margin-top: 22px; border: 0; border-radius: 7px; cursor: pointer; color: white; background: var(--purple); font-size: 15px; font-weight: 700; transition: background .2s ease, transform .2s ease; }.primary-button:hover { background: var(--purple-dark); transform: translateY(-1px); }.primary-button:focus-visible, input:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid #c4b5fd; outline-offset: 3px; }
 .test-help { margin: 17px 0 0; color: var(--muted); font-size: 14px; line-height: 1.6; }.test-help button, .reset-button { padding: 0; border: 0; cursor: pointer; color: var(--purple); background: transparent; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 
 .chart-section { margin-top: 22px; padding: 20px 22px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }.chart-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; }.chart-heading h2 { margin: 0; font-size: 15px; }.chart-legend { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12px; }.chart-legend i { width: 8px; height: 8px; display: inline-block; margin-left: 6px; border-radius: 50%; }.chart-legend i:first-child { margin-left: 0; }.normal-dot { background: var(--purple); }.anomaly-dot { background: var(--danger); }.chart-section canvas { display: block; width: 100%; height: 180px; margin-top: 14px; }.chart-empty { margin: -112px 0 91px; color: var(--muted); text-align: center; font-size: 13px; pointer-events: none; }.chart-section.has-data .chart-empty { display: none; }
 
 .result { position: relative; margin-top: 22px; padding: 25px 22px 24px; overflow: hidden; background: var(--purple-soft); border: 1px solid #ddd3fa; border-radius: 12px; }.result:before { position: absolute; inset: 0 auto 0 0; width: 4px; content: ""; background: var(--purple); }.result-heading { display: flex; align-items: center; gap: 8px; color: var(--purple-dark); font-size: 14px; font-weight: 700; }.result-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--purple); }.result strong { display: block; margin-top: 19px; font-size: 42px; line-height: 1; letter-spacing: -.06em; }.result p { margin: 11px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }.result.is-alert { background: #fce7f3; border-color: #f5c2df; }.result.is-alert:before, .result.is-alert .result-dot { background: var(--danger); }.result.is-alert .result-heading { color: var(--danger); }
+.analysis-result .result { margin-top: 0; }
 .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px; padding: 0 2px; }.metrics div { padding-top: 15px; border-top: 1px solid var(--border); }.metrics span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 13px; }.metrics strong { font-size: 15px; font-weight: 650; }.response { margin-top: 31px; color: var(--muted); font-size: 14px; line-height: 1.5; }.reset-button { display: block; margin-top: 14px; color: var(--muted); font-size: 14px; font-weight: 500; }.reset-button:hover { color: var(--purple); }
 footer { display: flex; justify-content: space-between; padding: 18px 0 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
-@media (max-width: 600px) { .page-shell { width: min(100% - 30px, 760px); }.topbar { min-height: 68px; }.connection { font-size: 11px; }.main-content { padding: 64px 0 55px; }.detector, .chart-section { padding: 18px; }.metrics { gap: 11px; }.chart-heading { align-items: flex-start; flex-direction: column; gap: 8px; }footer { gap: 15px; flex-direction: column; } }
+@media (max-width: 800px) { .analysis-layout { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .page-shell { width: 100%; padding: 0 20px; }.topbar { min-height: 68px; }.connection { font-size: 11px; }.main-content { padding: 64px 0 55px; }.detector, .chart-section { padding: 18px; }.metrics { gap: 11px; }.chart-heading { align-items: flex-start; flex-direction: column; gap: 8px; }footer { gap: 15px; flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; }.primary-button { transition: none; } }
+
+/* En escritorio, toda la demo cabe en la ventana sin perder legibilidad. */
+@media (min-width: 801px) {
+  html, body { height: 100%; overflow: hidden; }
+  .page-shell { height: 100vh; min-height: 0; }
+  .topbar { flex: 0 0 64px; min-height: 64px; }
+  .main-content { height: calc(100vh - 55px); min-height: 0; padding: clamp(16px, 2vh, 24px) 0 clamp(20px, 3vh, 32px); display: grid; grid-template-rows: auto minmax(205px, auto) minmax(145px, 1fr); gap: clamp(14px, 2vh, 22px); }
+  .intro { margin: 0; }
+  .intro h1 { font-size: clamp(32px, 4vw, 44px); }
+  .intro-copy { margin-top: 10px; font-size: 15px; }
+  .analysis-layout { height: 100%; min-height: 0; gap: 18px; }
+  .detector { min-height: 0; padding: 18px; display: flex; flex-direction: column; justify-content: center; }
+  .detector form { margin: 0; }
+  .test-help { margin-bottom: 0; }
+  .analysis-result { min-height: 0; display: flex; flex-direction: column; }
+  .analysis-result .result { flex: 1; min-height: 0; padding: 18px 20px; }
+  .result strong { margin-top: 12px; font-size: 36px; }
+  .result p { margin-top: 8px; font-size: 14px; }
+  .metrics { margin-top: 12px; }
+  .response { margin-top: 12px; }
+  .reset-button { margin-top: 8px; }
+  .chart-section { position: relative; min-height: 0; padding: 16px 18px 12px; display: flex; flex-direction: column; }
+  .chart-section canvas { flex: 1; min-height: 90px; height: auto; margin-top: 8px; }
+  .chart-empty { position: absolute; top: 56%; right: 18px; left: 18px; margin: 0; }
+  footer { flex: 0 0 55px; min-height: 55px; padding: 14px 0 20px; }
+}
+
+/* Lectura del gráfico: línea visible y valores identificables por número. */
+.chart-section canvas { min-height: 150px; height: 150px; padding: 4px 0; background: #fdfcff; border-radius: 6px; }
+.chart-data { display: flex; flex-wrap: wrap; gap: 7px; min-height: 25px; margin-top: 8px; }
+.chart-data-item { padding: 5px 8px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); background: var(--background); font-size: 12px; white-space: nowrap; }
+.chart-data-item.anomaly { border-color: #f0a7dc; color: var(--danger); background: #fce7f3; font-weight: 700; }
+.chart-data-item.context { color: #8f7bbd; background: #f7f3ff; }
+.chart-empty { position: static; margin: 8px 0 0; font-size: 13px; }
+.chart-section.has-data .chart-empty { display: none; }
+@media (min-width: 801px) {
+  .main-content { padding-top: clamp(16px, 2.5vh, 26px); }
+  .chart-section canvas { flex: none; }
+}
+
+/* El encabezado queda centrado y ocupa solo el espacio necesario. */
+.intro { text-align: center; }
+.intro-copy { max-width: none; margin: 13px auto 0; font-size: 15px; }
+@media (min-width: 801px) {
+  .main-content { padding-top: clamp(8px, 1.5vh, 16px); }
+}
+@media (max-width: 600px) {
+  .main-content { padding-top: 40px; }
+}
+
+/* Distribución estable en escritorio: ningún bloque puede invadir al siguiente. */
+@media (min-width: 801px) {
+  .main-content {
+    height: calc(100vh - 55px);
+    min-height: 0;
+    min-width: 0;
+    padding-top: 24px;
+    padding-bottom: 16px;
+    display: grid;
+    grid-template-columns: minmax(300px, .72fr) minmax(0, 1.28fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      "intro intro"
+      "analysis chart";
+    gap: 18px 28px;
+    overflow: hidden;
+  }
+  .intro { grid-area: intro; margin: 0; }
+  .analysis-layout {
+    grid-area: analysis;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 18px;
+  }
+
+  .analysis-layout > .detector,
+  .analysis-layout > .analysis-result {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .analysis-layout .detector { flex: 0 0 auto; }
+  .analysis-layout .analysis-result { flex: 1 1 0; min-height: 0; }
+  .chart-section {
+    grid-area: chart;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+  }
+  .chart-section canvas {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 180px;
+  }
+  .chart-data { max-height: 31px; overflow: hidden; }
+  .chart-empty {
+    position: absolute;
+    top: 54%;
+    right: 18px;
+    left: 18px;
+    margin: 0;
+    transform: translateY(-50%);
+  }
+}
+
+/* Ajuste final de densidad para que la demo completa quepa sin solapamientos. */
+@media (min-width: 801px) {
+  .main-content {
+    height: calc(100vh - 44px);
+    padding-top: 12px;
+    padding-bottom: 8px;
+    gap: 14px 24px;
+  }
+
+  .intro .label {
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+
+  .intro h1 {
+    font-size: clamp(32px, 3.3vw, 42px);
+    line-height: 1;
+  }
+
+  .intro-copy {
+    margin-top: 7px;
+    font-size: 14px;
+    line-height: 1.3;
+  }
+
+  .analysis-layout {
+    gap: 12px;
+  }
+
+  .detector {
+    padding: 16px;
+    justify-content: flex-start;
+  }
+
+  .detector label {
+    margin-bottom: 7px;
+    font-size: 13px;
+  }
+
+  .input-line {
+    padding-bottom: 6px;
+  }
+
+  .input-line input {
+    font-size: 34px;
+  }
+
+  .primary-button {
+    min-height: 42px;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+
+  .test-help {
+    margin-top: 11px;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .analysis-result {
+    overflow: hidden;
+  }
+
+  .analysis-result .result {
+    padding: 14px 16px;
+  }
+
+  .result-heading {
+    font-size: 13px;
+  }
+
+  .result strong {
+    margin-top: 8px;
+    font-size: 32px;
+  }
+
+  .result p {
+    margin-top: 6px;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+
+  .metrics {
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .metrics div {
+    padding-top: 9px;
+  }
+
+  .metrics span {
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+
+  .metrics strong {
+    font-size: 14px;
+  }
+
+  .response {
+    margin-top: 10px;
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  .reset-button {
+    margin-top: 6px;
+    font-size: 12px;
+  }
+
+  .chart-section {
+    margin-top: 0;
+    padding: 16px 18px 12px;
+  }
+
+  footer {
+    flex: 0 0 44px;
+    min-height: 44px;
+    padding: 10px 0 12px;
+    font-size: 11px;
+  }
+}
+
+/* El canvas conserva su proporción real: la escala y la rejilla se dibujan en JavaScript. */
+.chart-section canvas {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+
+/* El gráfico es la lectura principal de la demo. */
+@media (min-width: 801px) {
+  .main-content {
+    grid-template-rows: auto minmax(220px, 1.2fr) minmax(205px, auto);
+    grid-template-areas:
+      "intro"
+      "chart"
+      "analysis";
+  }
+  .intro { grid-area: intro; }
+  .chart-section { grid-area: chart; min-height: 0; padding: 18px 22px 14px; }
+  .chart-section canvas { height: clamp(150px, 22vh, 220px); min-height: 150px; }
+  .analysis-layout { grid-area: analysis; }
+}
+
+/* En escritorio: controles y análisis en columna izquierda, gráfico a la derecha. */
+@media (min-width: 801px) {
+  .main-content {
+    height: calc(100vh - 55px);
+    min-height: 0;
+    padding-top: 24px;
+    padding-bottom: 16px;
+    display: grid;
+    grid-template-columns: minmax(300px, .72fr) minmax(0, 1.28fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      "intro intro"
+      "analysis chart";
+    gap: 18px 28px;
+    overflow: hidden;
+  }
+
+  .intro {
+    grid-area: intro;
+    margin: 0;
+  }
+
+  .analysis-layout {
+    grid-area: analysis;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .analysis-layout .detector {
+    flex: 0 0 auto;
+  }
+
+  .analysis-layout .analysis-result {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  .chart-section {
+    grid-area: chart;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .chart-section canvas {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 180px;
+  }
+
+  .chart-data {
+    max-height: 31px;
+    overflow: hidden;
+  }
+
+  .chart-empty {
+    position: absolute;
+    top: 54%;
+    right: 18px;
+    left: 18px;
+    margin: 0;
+    transform: translateY(-50%);
+  }
+}
