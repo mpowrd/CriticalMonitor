@@ -1,0 +1,36 @@
+services:
+  web:
+    build: .
+    ports:
+      - "4000:80"
+    environment:
+      REDIS_HOST: redis
+    depends_on:
+      redis:
+        condition: service_started
+    networks:
+      - critical-net
+
+  redis:
+    image: redislabs/redistimeseries:latest
+    ports:
+      - "6379:6379"
+    networks:
+      - critical-net
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - redis
+    networks:
+      - critical-net
+
+volumes:
+  grafana_data:
+
+networks:
+  critical-net:

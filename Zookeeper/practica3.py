@@ -1,121 +1,103 @@
-from kazoo.client import KazooClient
-from kazoo.recipe.election import Election
+"""Productor distribuido y elección de líder con ZooKeeper.
+
+Cada instancia publica su última medición como nodo efímero. Solo el líder
+calcula la media del conjunto y la envía a la API de Critical Signal.
+"""
+
+from __future__ import annotations
+
+import os
+import random
+import signal
 import threading
 import time
-import random
-import os
-import requests 
-import numpy as np
 import uuid
 
-# Importar el módulo signal
-import signal
-
-# Definir una función que se ejecuta cuando se recibe la señal de interrupción
-def interrupt_handler(signal, frame):
-    print(f"La aplicación {id} ha muerto")
-    exit(0)
-
-# Registrar la función como el manejador de la señal de interrupción
-signal.signal(signal.SIGINT, interrupt_handler)
-
-# Crear un identificador para la aplicación
-id = os.getenv('ID',uuid.uuid4()) #tomamos variable del entorno
-id = random.randint(1,100)
+import numpy as np
+import requests
+from kazoo.client import KazooClient
+from kazoo.recipe.election import Election
 
 
-# Crear un cliente kazoo y conectarlo con el servidor zookeeper
-ZOOKEEPER_HOST = os.getenv('ZOOKEEPER_HOST', 'zookeeper:2181') # para el compose es zookeeper:2181 #tomamos variable del entorno
+NODE_ID = os.getenv("ID", str(uuid.uuid4())[:8])
+ZOOKEEPER_HOST = os.getenv("ZOOKEEPER_HOST", "zookeeper:2181")
+WEB_URL = os.getenv("WEB_URL", "http://web:80/nuevo")
+MEASUREMENTS_PATH = "/mediciones"
+
 client = KazooClient(hosts=ZOOKEEPER_HOST)
-client.start()
 
-# Crear una elección entre las aplicaciones y elegir un líder
-election = Election(client, "/election",id)
 
-# Definir una función que se ejecuta cuando una aplicación es elegida líder
-def leader_func():
-    while True:
-        print('soy lider')
-        time.sleep(3)
-
-        # Obtener los hijos de /mediciones
-        children = client.get_children("/mediciones")
-        
-
-        while len(children) == 0:
-            time.sleep(2)
-            children = client.get_children("/mediciones")
-        
-
+def connect_zookeeper():
+    for attempt in range(1, 13):
         try:
-            mediciones = []  # Lista para almacenar las mediciones
-            for name in children:
-                # Obtén los datos del cliente
-                (data, _) = client.get(f"/mediciones/{name}")
-                
-                # Decodifica y convierte a entero
-                medicion = int(data.decode("utf-8")) if isinstance(data, bytes) else int(data)
-                mediciones.append(medicion)  # Agrega los datos a la lista
-        except ValueError as e:
-            print(f"Error al convertir los datos a enteros: {e}")
-        except Exception as e:
-            print(f"Error al procesar las mediciones: {e}")
+            client.start(timeout=5)
+            return
+        except Exception as exc:
+            print(f"ZooKeeper aún no está listo ({attempt}/12): {exc}")
+            time.sleep(2)
+    raise RuntimeError("No se pudo conectar con ZooKeeper después de 12 intentos")
 
-        # Calcula la media de las mediciones
-        if mediciones:
-            print(f"Conjunto de mediciones: {mediciones}")
 
-            # Calcular la media de los valores
-            media = np.mean(mediciones) 
+connect_zookeeper()
+client.ensure_path(MEASUREMENTS_PATH)
+election = Election(client, "/election", NODE_ID)
 
-            # Mostrar la media por consola
-            print(f'La media de los valores de los hijos: {media}') 
+
+def interrupt_handler(_signal, _frame):
+    print(f"La aplicación {NODE_ID} ha terminado")
+    client.stop()
+    client.close()
+    raise SystemExit(0)
+
+
+signal.signal(signal.SIGINT, interrupt_handler)
+signal.signal(signal.SIGTERM, interrupt_handler)
+
+
+def leader_func():
+    """Agrega las mediciones de los nodos mientras esta instancia sea líder."""
+    while True:
+        children = client.get_children(MEASUREMENTS_PATH)
+        measurements = []
+
+        for name in children:
+            try:
+                data, _ = client.get(f"{MEASUREMENTS_PATH}/{name}")
+                measurements.append(float(data.decode("utf-8")))
+            except (ValueError, TypeError):
+                print(f"Medición inválida en {name}; se ignora")
+
+        if measurements:
+            average = float(np.mean(measurements))
+            print(f"Líder {NODE_ID} · {len(measurements)} nodos · media {average:.2f}")
+            try:
+                response = requests.get(WEB_URL, params={"dato": average}, timeout=5)
+                response.raise_for_status()
+                print("Media enviada a Critical Signal")
+            except requests.RequestException as exc:
+                print(f"No se pudo enviar la media: {exc}")
         else:
-            print("No se pudieron calcular las mediciones.")
-    
-        # Enviar la media usando requests
-        url = 'http://web:80/nuevo' # Definimos la URL a la que queremos hacer la petición
-        params = {'dato': media} # Definimos el parámetro que queremos enviar
-        response = requests.get(url, params=params) # Hacemos la petición GET con el parámetro y guardamos la respuesta en una variable
-        if response.status_code == 200: # Comprobamos si la petición fue exitosa
-            print("La petición a la APP fue exitosa") # Imprimimos los datos
+            print("Líder a la espera de mediciones")
+
         time.sleep(5)
 
 
-# Definir una función que se encarga de lanzar la parte de la elección
 def election_func():
-    # Participar en la elección con el identificador de la aplicación
     election.run(leader_func)
 
-# Crear un hilo para ejecutar la función election_func
+
 election_thread = threading.Thread(target=election_func, daemon=True)
-# Iniciar el hilo
 election_thread.start()
 
-# Enviar periódicamente un valor a una subruta de /mediciones con el identificador de la aplicación
-while True:
-    # Generar una nueva medición aleatoria
-    value = random.randint(75, 85)
-    value = str(value)
-    print(f'Id:  {id}, Value: {value}')
-
-    # Esperar 5 segundos
-    time.sleep(5)
-
-    # Actualizar el valor de /values asociado al nodo
-
-    try:
-        # Asegurar que existe la ruta de acceso y si no la crea
-        client.ensure_path("/mediciones")
-        if client.exists(f"/mediciones/value{id}"):
-            # Modificamos el nodo
-            client.set(f"/mediciones/value{id}", value.encode("utf-8"))
+try:
+    while True:
+        value = str(random.randint(75, 85))
+        node_path = f"{MEASUREMENTS_PATH}/value{NODE_ID}"
+        if client.exists(node_path):
+            client.set(node_path, value.encode("utf-8"))
         else:
-            # Creamos un nodo con datos
-            client.create(f"/mediciones/value{id}", value.encode("utf-8"), ephemeral=True)
-        
+            client.create(node_path, value.encode("utf-8"), ephemeral=True)
+        print(f"Nodo {NODE_ID} · valor {value}")
         time.sleep(5)
-
-    except:
-        print('node creation exception (maybe exists)')
- 
+except (KeyboardInterrupt, ConnectionError):
+    interrupt_handler(None, None)

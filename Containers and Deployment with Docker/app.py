@@ -1,252 +1,280 @@
-from datetime import datetime
-from flask import Flask, jsonify
-from flask import request
-from redis import Redis, RedisError
+"""Critical Signal: API de monitorización y detección de anomalías.
+
+La aplicación conserva las rutas originales de la práctica y añade una API JSON
+para que la demo pueda ser consumida desde el dashboard o desde otros servicios.
+"""
+
+from __future__ import annotations
+
 import os
 import socket
 import time
-import json
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
 import numpy as np
-import tensorflow as tf
+from flask import Flask, jsonify, render_template, request
 from keras.models import load_model
+from redis import Redis, RedisError
 
 
-# Connect to Redis
-REDIS_HOST = os.getenv('REDIS_HOST', "localhost")
-print("REDIS_HOST: "+REDIS_HOST)
-redis = Redis(host=REDIS_HOST, db=0, socket_connect_timeout=2, socket_timeout=2)
+BASE_DIR = Path(__file__).resolve().parent
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+PORT = int(os.getenv("PORT", "80"))
+WINDOW_SIZE = int(os.getenv("WINDOW_SIZE", "3"))
+SERIES_NAME = os.getenv("SERIES_NAME", "mediciones_lista")
+MODEL_PATH = Path(os.getenv("MODEL_PATH", str(BASE_DIR / "modelo.keras")))
+THRESHOLD_PATH = Path(
+    os.getenv("THRESHOLD_PATH", str(BASE_DIR / "UmbralDeAnomalias.txt"))
+)
 
-app= Flask(__name__)
+app = Flask(__name__)
 
-WindowSize = 3
+redis_client = Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    db=0,
+    decode_responses=True,
+    socket_connect_timeout=2,
+    socket_timeout=2,
+)
 
-# Leer el archivo
-with open('UmbralDeAnomalias.txt', 'r') as file:
-    umbral = float(file.readline().strip())  # Leer la primera línea
 
-modelo = load_model("modelo.keras")
-
-@app.route("/")
-def hello():
+def load_threshold() -> float:
+    """Carga el umbral generado por el entrenamiento del autoencoder."""
     try:
-        visits = redis.incr("counter")
-    except RedisError:
-        visits = "<i>cannot connect to Redis, counter disabled</i>"
-
-    html ="""
-        <h1>Práctica 2 - Desarrollo de Software Crítico</h1>
-        <p><b>Hostname:</b> {hostname}</p>
-        <p><b>Visits:</b> {visits}</p>
-      
-
-        <h2>3º de Ingeniería de Software</h2>
-        
-        <h2>Explicación de la Práctica</h2>
-        <div class="explanation">
-            En esta práctica de Desarrollo de Software Crítico, el objetivo es diseñar un sistema de monitorización de mediciones basado en contenedores utilizando Docker Swarm. El sistema incluye una API REST desarrollada con Flask para gestionar las mediciones y RedisTimeSeries como base de datos para el almacenamiento de datos temporales. Adicionalmente, se integrará Grafana para la visualización de las mediciones.
-        </div>
-        <b>
-            Comandos : <br>
-        </b>
-        <div>
-            <b>'/nuevo':</b> añadir nueva medición <br>
-            <b>'/listar':</b> mostrar lista de mediciones<br>
-            <b>'/eliminarLista':</b> elimina todas las mediciones<br>
-        </div>
-        
-    """
-    
-    return html.format(hostname=socket.gethostname(), visits=visits)
+        return float(THRESHOLD_PATH.read_text(encoding="utf-8").splitlines()[0])
+    except (FileNotFoundError, ValueError, IndexError):
+        return float(os.getenv("ANOMALY_THRESHOLD", "2.2125982130317277"))
 
 
-@app.route("/nuevo")
-def agregarNuevaMedicon():
-    
-    #Tomamos el datos de la ruta
-    dato = request.args.get("dato")
+ANOMALY_THRESHOLD = load_threshold()
+MODEL: Any | None = None
+MODEL_ERROR: str | None = None
 
-    #Si existe un dato
-    if  dato:
-        try:
-            #Transformamos el dato en un valor float
-            float(dato)
-
-            #Tomamos un timestamp actual y lo transformamos a milisegundos (formato adecuado)
-            timestamp = int(time.time() * 1000)
-
-            #Añadimos a la serie temporal
-            redis.execute_command('TS.ADD','mediciones_lista',timestamp,dato)
-            #redis.rpush("mediciones_lista",dato)
-
-            #Imprimimos el dato insertado por pantalla
-            html= "<h1>Práctica 2 - Desarrollo de Software Crítico</h1>" \
-                            "<h2>Nuevo dato</h2>" \
-                            "<b> Value:</b> {num}"
-            return html.format(num=dato)
-
-        except ValueError:
-            return "<i>El valor introducido debe de ser un número</i>"
-        except RedisError:
-            return "<i>No se puede conectar a Redis</i>" 
-    else:
-        return "<b>El valor no es válido, por favor introduzca los datos de nuevo</b>"
-
-    
-
-    
-@app.route("/listar")
-def mostrarLista():
-
-    try:
-        #Mostramos el hostname
-        hostname = socket.gethostname()
-        fila = f"<p>Hostname: {hostname} </p>"
-
-        #Si la serie temporal no existe mostramos un error
-        if not redis.exists("mediciones_lista"):
-            return "<h1>No hay datos en la serie</h1>"
+try:
+    MODEL = load_model(MODEL_PATH)
+except (OSError, ValueError, ImportError) as exc:
+    MODEL_ERROR = str(exc)
 
 
-        #Tomamos todas las medidas de la serie temporal
-        mediciones = redis.execute_command('TS.RANGE','mediciones_lista', '-', '+')
-
-        for medida in mediciones:
-            #Transformamos el timestamp que está en milisegundos a un formato fecha con hora, minutos y segundos
-            timestamp_legible = datetime.fromtimestamp(int(medida[0]) / 1000).strftime('%Y-%m-%d %H:%M:%S')
-   
-            #Comprobamos que el valor asociado al timestamp es un valor numérico
-            valor = float(medida[1])
-            
-            #Añadimos a la lista la medición para mostrarla
-            fila += f" <p>Medición, Timestamp: {timestamp_legible}, Valor: {valor}</p>"
-            
-
-        return fila
-    except Exception as e:
-        return e
-    except RedisError:
-        return "<i>No se puede conectar con Redis</i>"
-
-    
-
-@app.route("/eliminarLista")
-def eliminarLista():
-    try:
-        #Si la serie temporal no existe mostramos un error
-        if not redis.exists("mediciones_lista"):
-            return "<h2>No hay datos en la serie</h2>"
-
-        #Borramos la serie temporal
-        redis.delete("mediciones_lista")
-        return "<h2>La lista ha sido eliminada</h2>"
-    except RedisError:
-        return "<i>No se puede conectar con redis</i>"
-
-    
-@app.route("/detectar")
-def deteccionAnomalias():
-
-    #Tomamos el datos de la ruta
-    dato = request.args.get("dato")
-
-    #Si existe un dato
-    if  dato:
-        try:
-            #Transformamos el dato en un valor float
-            dato = float(dato)
-
-            #Tomamos un timestamp actual y lo transformamos a milisegundos (formato adecuado)
-            timestamp = int(time.time() * 1000)
-            timestamp_legible = datetime.fromtimestamp(timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S')
-
-            indice_actual=0
-            
-            if redis.exists("mediciones_lista"):
-                #Para realizar la predicción consultamos los datos anteriores introducidos
-                mediciones_lista = redis.execute_command('TS.RANGE','mediciones_lista', '-', '+')
-                # Convertir las mediciones a un arreglo de NumPy
-                mediciones_np = np.array(mediciones_lista)
-                # Calcular el índice actual basado en la longitud de las mediciones
-                indice_actual = len(mediciones_np)
+def utc_iso(timestamp_ms: int) -> str:
+    """Devuelve una fecha ISO 8601 legible y estable entre entornos."""
+    return datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc).isoformat()
 
 
+def read_measurements(limit: int | None = None) -> list[dict[str, Any]]:
+    """Lee la serie temporal y normaliza la respuesta de Redis a JSON."""
+    # Una demo recién arrancada todavía no tiene una serie creada.
+    # Es un estado vacío válido, no un fallo de Redis.
+    if not redis_client.exists(SERIES_NAME):
+        return []
+    raw = redis_client.execute_command("TS.RANGE", SERIES_NAME, "-", "+")
+    measurements = [
+        {
+            "timestamp": int(timestamp),
+            "time": utc_iso(int(timestamp)),
+            "value": float(value),
+        }
+        for timestamp, value in raw
+    ]
+    return measurements[-limit:] if limit else measurements
 
 
-            #Añadimos a la serie temporal
-            redis.execute_command('TS.ADD','mediciones_lista',timestamp,dato)
-            
-                        
-            anomalia = "no"
-            prediccion = -1
-            error = 0
+def parse_value(source: Any) -> float:
+    """Valida y convierte el valor recibido por query string o JSON."""
+    if isinstance(source, dict) or hasattr(source, "get"):
+        source = source.get("value", source.get("dato"))
+    if source is None or str(source).strip() == "":
+        raise ValueError("Falta el valor de la medición.")
+    value = float(source)
+    if not np.isfinite(value):
+        raise ValueError("La medición debe ser un número finito.")
+    return value
 
-            
 
-            if indice_actual>=3:
-                mediciones_np = mediciones_np[-WindowSize:]
-                ventana_valores = [float(m[1]) for m in mediciones_np]
-                ventana_valores = np.array(ventana_valores).reshape((1,WindowSize,1))
- 
-                prediccion = modelo.predict(ventana_valores)[0][0] 
-                prediccion = prediccion[0]
-                # Calcular la diferencia y verificar anomalía 
-                error = abs(prediccion - dato) 
-                error = error
-                anomalia = "si" if error > umbral else "no"
+def predict(value: float, previous: list[dict[str, Any]]) -> dict[str, Any]:
+    """Predice el siguiente valor y clasifica la medición actual."""
+    if len(previous) < WINDOW_SIZE:
+        return {
+            "status": "warming_up",
+            "anomaly": False,
+            "anomaly_label": "Recopilando contexto",
+            "prediction": None,
+            "error": None,
+        }
 
-                mediciones = [
-                {
-                    "time": datetime.fromtimestamp(ts / 1000).strftime('%Y-%m-%d %H:%M:%S'), # Convertir a ISO 8601
-                    "valor": valor
-                }
-                for ts, valor in mediciones_lista[-WindowSize:]
-                ]
+    if MODEL is None:
+        return {
+            "status": "model_unavailable",
+            "anomaly": None,
+            "anomaly_label": "Modelo no disponible",
+            "prediction": None,
+            "error": None,
+        }
 
-                
+    window = np.array([item["value"] for item in previous[-WINDOW_SIZE:]])
+    model_input = window.reshape((1, WINDOW_SIZE, 1))
+    model_output = np.asarray(MODEL.predict(model_input, verbose=0))
+    # El artefacto guardado es un autoencoder LSTM que reconstruye la ventana.
+    # Usamos el último paso, igual que en el experimento que generó el umbral.
+    prediction = (
+        float(model_output[0, -1, 0])
+        if model_output.ndim == 3
+        else float(model_output.reshape(-1)[0])
+    )
+    error = abs(prediction - value)
+    anomaly = error > ANOMALY_THRESHOLD
+    return {
+        "status": "anomaly" if anomaly else "normal",
+        "anomaly": anomaly,
+        "anomaly_label": "Anomalía detectada" if anomaly else "Dentro del patrón",
+        "prediction": prediction,
+        "error": error,
+    }
 
-            else :
-                mediciones={
-                "medicion": timestamp_legible,
-                "valor_real":dato
-                }
 
-            respuesta = {
-            "mediciones": mediciones,
-            "anomalia": anomalia,
-            "prediccion":prediccion,
-            "error":error
+def enrich_measurements(
+    measurements: list[dict[str, Any]], limit: int = 40
+) -> list[dict[str, Any]]:
+    """Añade el estado de anomalía de cada señal para la visualización."""
+    start = max(0, len(measurements) - limit)
+    enriched = []
+    for index in range(start, len(measurements)):
+        item = measurements[index]
+        analysis = predict(item["value"], measurements[:index])
+        enriched.append(
+            item
+            | {
+                "anomaly": analysis["anomaly"],
+                "status": analysis["status"],
             }
-            
-            
-            with open('Resultados.txt', 'a') as file:
-                file.write(f"{respuesta}\n")
+        )
+    return enriched
 
 
-            #Imprimimos el dato nuevo por pantalla
-            html= """
-            <h1>Práctica 2 - Desarrollo de Software Crítico</h1>
-            <h2>Nuevo dato</h2>
-            <b> Value:</b> {num}<br>
-            <b> Prediccion:</b> {pred}<br>
-            <b> Error:</b> {err}<br>
-            <b> Anomalia:</b> {anomal}<br>
-            <b> Respuesta (almacenada en archivo .txt):</b> {res}<br>
-            """
-            return html.format(num=dato,pred= prediccion,err=error,anomal=anomalia,res= respuesta) 
-
-        except ValueError:
-            return "<i>El valor introducido debe de ser un número</i>"
-        except RedisError:
-            return "<i>No se puede conectar a Redis</i>" 
-    else:
-        return "<b>El valor no es válido, por favor introduzca los datos de nuevo</b>"
+def base_payload() -> dict[str, Any]:
+    return {
+        "service": "critical-signal-api",
+        "hostname": socket.gethostname(),
+        "threshold": ANOMALY_THRESHOLD,
+        "window_size": WINDOW_SIZE,
+        "model_loaded": MODEL is not None,
+    }
 
 
+@app.get("/")
+def dashboard():
+    return render_template(
+        "index.html",
+        threshold=ANOMALY_THRESHOLD,
+        window_size=WINDOW_SIZE,
+        model_loaded=MODEL is not None,
+        hostname=socket.gethostname(),
+    )
+
+
+@app.get("/api/health")
+def health():
+    try:
+        redis_client.ping()
+        redis_status = "connected"
+    except RedisError:
+        redis_status = "unavailable"
+
+    ready = redis_status == "connected" and MODEL is not None
+    response = base_payload() | {
+        "status": "ok" if ready else "degraded",
+        "redis": redis_status,
+        "model_error": MODEL_ERROR,
+    }
+    return jsonify(response), 200 if ready else 503
+
+
+@app.get("/api/measurements")
+def measurements():
+    try:
+        limit = min(max(int(request.args.get("limit", 40)), 1), 200)
+        history = read_measurements()
+        return jsonify(
+            base_payload()
+            | {"measurements": enrich_measurements(history, limit)}
+        )
+    except (RedisError, ValueError) as exc:
+        return jsonify({"error": f"No se pudieron leer las mediciones: {exc}"}), 503
+
+
+def store_measurement(value: float) -> dict[str, Any]:
+    previous = read_measurements()
+    timestamp = int(time.time() * 1000)
+    redis_client.execute_command("TS.ADD", SERIES_NAME, timestamp, value)
+    analysis = predict(value, previous)
+    measurement = {"timestamp": timestamp, "time": utc_iso(timestamp), "value": value}
+    result = base_payload() | {
+        "measurement": measurement,
+        "analysis": analysis,
+        "measurements": enrich_measurements(previous + [measurement]),
+    }
+
+    with (BASE_DIR / "Resultados.txt").open("a", encoding="utf-8") as file:
+        file.write(f"{result}\n")
+    return result
+
+
+@app.post("/api/detect")
+def detect_api():
+    try:
+        payload = request.get_json(silent=True) or request.args.to_dict()
+        value = parse_value(payload)
+        return jsonify(store_measurement(value))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RedisError:
+        return jsonify({"error": "RedisTimeSeries no está disponible."}), 503
+
+
+@app.post("/api/reset")
+def reset_api():
+    try:
+        deleted = bool(redis_client.delete(SERIES_NAME))
+        return jsonify({"deleted": deleted, "message": "Serie reiniciada."})
+    except RedisError:
+        return jsonify({"error": "RedisTimeSeries no está disponible."}), 503
+
+
+# Compatibilidad con las rutas utilizadas en las prácticas y en ZooKeeper.
+@app.get("/nuevo")
+def add_legacy():
+    try:
+        value = parse_value(request.args)
+        previous = read_measurements()
+        timestamp = int(time.time() * 1000)
+        redis_client.execute_command("TS.ADD", SERIES_NAME, timestamp, value)
+        return jsonify(
+            {"ok": True, "value": value, "timestamp": timestamp, "context": len(previous)}
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RedisError:
+        return jsonify({"ok": False, "error": "RedisTimeSeries no está disponible."}), 503
+
+
+@app.route("/detectar", methods=["GET", "POST"])
+def detect_legacy():
+    return detect_api()
+
+
+@app.get("/listar")
+def list_legacy():
+    return measurements()
+
+
+@app.get("/eliminarLista")
+def delete_legacy():
+    return reset_api()
 
 
 if __name__ == "__main__":
-    PORT = os.getenv('PORT', 80)
-    print("PORT: "+str(PORT))
-    app.run(host='0.0.0.0', port=PORT)
-
-
+    app.run(host="0.0.0.0", port=PORT)

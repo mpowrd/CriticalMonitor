@@ -1,0 +1,62 @@
+services:
+  web:
+    build: ../Containers and Deployment with Docker
+    ports:
+      - "4000:80"
+    environment:
+      REDIS_HOST: redis
+    depends_on:
+      - redis
+    networks:
+      - critical-net
+
+  redis:
+    image: redislabs/redistimeseries:latest
+    networks:
+      - critical-net
+
+  zookeeper:
+    image: zookeeper:3.9
+    ports:
+      - "2181:2181"
+    networks:
+      - critical-net
+
+  producer-1:
+    build: .
+    environment:
+      ID: producer-1
+      ZOOKEEPER_HOST: zookeeper:2181
+      WEB_URL: http://web:80/nuevo
+    depends_on:
+      - zookeeper
+      - web
+    networks:
+      - critical-net
+
+  producer-2:
+    build: .
+    environment:
+      ID: producer-2
+      ZOOKEEPER_HOST: zookeeper:2181
+      WEB_URL: http://web:80/nuevo
+    depends_on:
+      - zookeeper
+      - web
+    networks:
+      - critical-net
+
+  producer-3:
+    build: .
+    environment:
+      ID: producer-3
+      ZOOKEEPER_HOST: zookeeper:2181
+      WEB_URL: http://web:80/nuevo
+    depends_on:
+      - zookeeper
+      - web
+    networks:
+      - critical-net
+
+networks:
+  critical-net:
